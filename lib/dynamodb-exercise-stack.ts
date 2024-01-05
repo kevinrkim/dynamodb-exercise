@@ -16,7 +16,7 @@ export class DynamodbExerciseStack extends cdk.Stack {
 
     // lambda function
     const songLambda = new lambda.Function(this, 'SongApiFunction', {
-      runtime: lambda.Runtime.NODEJS_LATEST,
+      runtime: lambda.Runtime.NODEJS_16_X,
       code: lambda.Code.fromAsset('lambda'),
       handler: 'index.handler',
       functionName: 'song-function',
@@ -26,8 +26,8 @@ export class DynamodbExerciseStack extends cdk.Stack {
     table.grantReadWriteData(songLambda);
 
     // api gateway
-    const api = new apigw.HttpApi(this, 'SongApi', {
-      apiName: 'song-api',
+    const api = new apigw.HttpApi(this, 'SongApi3', {
+      apiName: 'song-api-3',
     });
 
     // lambda proxy
