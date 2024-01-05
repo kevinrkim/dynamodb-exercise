@@ -1,107 +1,74 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as path from 'path';
+import { aws_apigatewayv2 as apigw, aws_apigatewayv2_integrations as apigwIntegrations } from 'aws-cdk-lib';
 
 export class DynamodbExerciseStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // setup DynamoDB table
-    const songTable = new dynamodb.Table(this, 'SongTable', {
-      tableName: 'song-table',
-      partitionKey: {
-        name: 'id',
-        type: dynamodb.AttributeType.STRING
-      },
+    // dynamodb table
+    const table = new cdk.aws_dynamodb.Table(this, 'SongApiTable', {
+      partitionKey: { name: 'id', type: cdk.aws_dynamodb.AttributeType.STRING },
+      tableName: 'song-items',
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // setup rest API
-    const songApi = new apigateway.RestApi(this, 'SongApi', {
-      restApiName: 'Song Service',
-      description: 'This service serves songs.',
-      deploy: true
-    });
-
-    // setup Lambda functions
-    const createSongLambda = new lambda.Function(this, 'CreateSongLambda', {
+    // lambda function
+    const songLambda = new lambda.Function(this, 'SongApiFunction', {
       runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: 'index.createHandler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../functions/create-song')),
-      environment: {
-        SONG_TABLE_NAME: songTable.tableName
-      }
+      code: lambda.Code.fromAsset('lambda'),
+      handler: 'index.handler',
+      functionName: 'song-function',
     });
 
-    const getSongLambda = new lambda.Function(this, 'GetSongLambda', {
-      runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: 'index.getHandler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../functions/get-song')),
-      environment: {
-        SONG_TABLE_NAME: songTable.tableName
-      }
+    // grant lambda permissions
+    table.grantReadWriteData(songLambda);
+
+    // api gateway
+    const api = new apigw.HttpApi(this, 'SongApi', {
+      apiName: 'song-api',
     });
 
-    const updateSongLambda = new lambda.Function(this, 'UpdateSongLambda', {
-      runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: 'index.updateHandler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../functions/update-song')),
-      environment: {
-        SONG_TABLE_NAME: songTable.tableName
-      }
+    // lambda proxy
+    const lambdaIntegration = new apigwIntegrations.HttpLambdaIntegration('LambdaIntegration', songLambda);
+
+    // api gateway routes
+    api.addRoutes({
+      path: '/songs',
+      methods: [apigw.HttpMethod.GET],
+      integration: lambdaIntegration,
     });
 
-    const deleteSongLambda = new lambda.Function(this, 'DeleteSongLambda', {
-      runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: 'index.deleteHandler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../functions/delete-song')),
-      environment: {
-        SONG_TABLE_NAME: songTable.tableName
-      }
+    api.addRoutes({
+      path: '/songs/{id}',
+      methods: [apigw.HttpMethod.GET],
+      integration: lambdaIntegration,
     });
 
-    const allSongsLambda = new lambda.Function(this, 'AllSongsLambda', {
-      runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: 'index.allHandler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../functions/all-songs')),
-      environment: {
-        SONG_TABLE_NAME: songTable.tableName
-      }
+    api.addRoutes({
+      path: '/songs',
+      methods: [apigw.HttpMethod.POST],
+      integration: lambdaIntegration,
     });
 
-    // connect Lambda functions to API Gateway
-    const songServiceResource = songApi.root.addResource('song');
-
-    songServiceResource.addMethod('POST', new apigateway.LambdaIntegration(createSongLambda), {
-      apiKeyRequired: false
+    api.addRoutes({
+      path: '/songs/{id}',
+      methods: [apigw.HttpMethod.PUT],
+      integration: lambdaIntegration,
     });
 
-    songServiceResource.addMethod('GET', new apigateway.LambdaIntegration(allSongsLambda), {
-      apiKeyRequired: false
+    api.addRoutes({
+      path: '/songs/{id}',
+      methods: [apigw.HttpMethod.DELETE],
+      integration: lambdaIntegration,
     });
 
-    const singleSongResource = songServiceResource.addResource('{id}');
-
-    singleSongResource.addMethod('GET', new apigateway.LambdaIntegration(getSongLambda), {
-      apiKeyRequired: false
+    new cdk.CfnOutput(this, 'APIGatewayEndpoint', {
+      exportName: 'APIGatewayEndpoint',
+      value: api.apiEndpoint,
+      description: 'API Gateway Endpoint',
     });
-
-    singleSongResource.addMethod('PUT', new apigateway.LambdaIntegration(updateSongLambda), {
-      apiKeyRequired: false
-    });
-
-    singleSongResource.addMethod('DELETE', new apigateway.LambdaIntegration(deleteSongLambda), {
-      apiKeyRequired: false
-    });
-
-    // grant permissions
-    songTable.grantReadWriteData(createSongLambda);
-    songTable.grantReadWriteData(getSongLambda);
-    songTable.grantReadWriteData(updateSongLambda);
-    songTable.grantReadWriteData(deleteSongLambda);
-    songTable.grantReadWriteData(allSongsLambda);
-
+    
   }
 }
