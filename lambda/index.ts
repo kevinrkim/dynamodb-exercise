@@ -1,6 +1,11 @@
 const AWS = require('aws-sdk');
 const dynamo = new AWS.DynamoDB.DocumentClient();
 
+import { handleGetAllSongs } from './get-all-songs';
+import { handleGetSong } from './get-song';
+import { handleDeleteSong } from './delete-song';
+import { handlePostSong } from './post-song';
+
 exports.handler = async (event: any, context: any) => {
     let body;
     let statusCode = 200;
@@ -11,44 +16,16 @@ exports.handler = async (event: any, context: any) => {
     try {
         switch (event.routeKey) {
             case "DELETE /songs/{id}":
-                await dynamo.delete({
-                    TableName: 'song-items',
-                    Key: {
-                        id: event.pathParameters.id
-                    }
-                }).promise();
-                body = `Deleted item ${event.pathParameters.id}`;
+                body = `Deleted item ${await handleDeleteSong(dynamo, event.pathParameters.id)}`;
                 break;
             case "GET /songs/{id}":
-                body = await dynamo.get({
-                    TableName: 'song-items',
-                    Key: {
-                        id: event.pathParameters.id
-                    }
-                }).promise();
-                break;
-            case "PUT /songs/{id}":
-                body = await dynamo.put({
-                    TableName: 'song-items',
-                    Item: JSON.parse(event.body)
-                }).promise();
+                body = await handleGetSong(dynamo, event.pathParameters.id);
                 break;
             case "GET /songs":
-                body = await dynamo.scan({ TableName: 'song-items' }).promise();
+                body = await handleGetAllSongs(dynamo);
                 break;
             case "POST /songs":
-                let requestJSON = JSON.parse(event.body);
-                await dynamo.put({
-                    TableName: 'song-items',
-                    Item: {
-                        id: requestJSON.id,
-                        title: requestJSON.title,
-                        artist: requestJSON.artist,
-                        album: requestJSON.album,
-                        year: requestJSON.year
-                    }
-                }).promise();
-                body = `Put item ${requestJSON.id}`;
+                body = `Put item ${await handlePostSong(dynamo, event.body)}`;
                 break;
             default:
                 throw new Error(`Unsupported route: "${event.routeKey}"`);
