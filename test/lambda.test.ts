@@ -1,41 +1,96 @@
 // @ts-ignore
 
-import { handler } from '../lambda/index.ts';
+// import { mockClient } from 'aws-sdk-client-mock';
+// import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb';
 
-const mockScan = jest.fn();
-const mockGet = jest.fn();
+// import { handleGetAllSongs } from '../lambda/get-all-songs';
+// import { handleGetSong } from '../lambda/get-song';
+// import { handleDeleteSong } from '../lambda/delete-song';
+// import { handlePostSong } from '../lambda/post-song';
 
-jest.mock('aws-sdk', () => {
-    return {
-        DynamoDB: {
-            DocumentClient: jest.fn(() => ({
-                scan: () => mockScan,
-                get: () => mockGet,
-            })),
-        },
-    };
-});
+import { DynamoDB, awsSdkPromiseResponse } from '../__mocks__/aws-sdk';
+import { handleGetSong } from '../lambda/get-song';
 
-// unit tests
+const db = new DynamoDB.DocumentClient();
 
-describe('GET all songs test', () => {
-    it('should return a list of all songs in dynamodb', async () => {
-        mockScan.mockResolvedValue({ Items: [{ id: '1', name: 'Since U Been Gone', artist: 'Kelly Clarkson', album: 'Breakaway' }, { id: '2', name: 'Because of You', artist: 'Kelly Clarkson', album: 'Breakaway' }] });
-        const event = {};
-        const response = await handler(event);
-        expect(response.statusCode).toBe(200);
-        expect(mockScan).toHaveBeenCalled();
-    });
-
-    it('should return a single song from dynamodb', async () => {
-        mockGet.mockResolvedValue({ Item: { id: '1', name: 'Since U Been Gone', artist: 'Kelly Clarkson', album: 'Breakaway' } });
-        const event = {
-            pathParameters: {
-                id: '1'
-            }
+describe('Get song method', () => {
+    test('return first song in db', async () => {
+        const song = {
+            id: '1',
+            title: 'Since U Been Gone',
+            artist: 'Kelly Clarkson'
         };
-        const response = await handler(event);
-        expect(response.statusCode).toBe(200);
-        expect(mockGet).toHaveBeenCalledWith({ TableName: 'song-items', Key: { id: '1' } });
-    });
-});
+
+        awsSdkPromiseResponse.mockReturnValueOnce(Promise.resolve({
+            id: '1',
+            title: 'Since U Been Gone',
+            artist: 'Kelly Clarkson'
+        }))
+
+        const returnedSong = await handleGetSong(db, '1');
+        expect(db.get).toHaveBeenCalledWith({
+            TableName: 'song-items',
+            Key: { id: '1' },
+        });
+
+        expect(returnedSong).toEqual(song);
+    })
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+// const ddbMock = mockClient(DynamoDBDocumentClient);
+
+// const mockDynamoDbScan = jest.fn();
+
+// jest.mock('aws-sdk/clients/dynamodb', () => ({
+//     DocumentClient: jest.fn().mockImplementation(() => ({
+//         scan: mockDynamoDbScan
+//     }))
+// }))
+
+// beforeEach(() => {
+//     ddbMock.reset();
+// });
+
+// describe('CRUD test suite', () => {
+//     it("should get user names from the DynamoDB", async () => {
+//         ddbMock.on(GetCommand).resolves({
+//             Item: {
+//                 id: "1",
+//                 title: "Since U Been Gone"
+//             },
+//         });
+//         const song = await handleGetSong(ddbMock, "1");
+//         expect(song.title).toStrictEqual(["Since U Been Gone"]);
+//     });
+// })
+
+// describe('CRUD test suite', () => {
+//     it('should return all songs from the DynamoDB', async () => {
+//         const mockData = {
+//             Items: [
+//                 { id: '1', title: 'Since U Been Gone', artist: 'Kelly Clarkson', album: 'Breakaway', year: '2004' },
+//                 { id: '2', title: 'Because of You', artist: 'Kelly Clarkson', album: 'Breakaway', year: '2004' },
+//             ]
+//         }
+//         ddbMock.on(ScanCommand).resolves(mockData);
+
+//         const response = await handleGetAllSongs(ddbMock);
+//         expect(response.statusCode).toEqual(200);
+//         expect(response.body).toEqual(JSON.stringify(mockData.Items));
+//     })
+// })
+
+
+
